@@ -41,37 +41,19 @@ class AckermannToTwist
   public gz::sim::ISystemConfigure,
   public gz::sim::ISystemPreUpdate
 {
-  // Gazebo transport node for publishing
   gz::transport::Node gz_node_;
-
-  // Gazebo publisher for the cmd_vel topic
   gz::transport::Node::Publisher cmd_vel_pub_;
-
-  // ROS 2 node for subscribing
   std::shared_ptr<rclcpp::Node> ros_node_;
-
-  // ROS 2 subscriber for the cmd_ackermann topic
   rclcpp::Subscription<ackermann_msgs::msg::AckermannDrive>::SharedPtr ros_sub_;
 
-  // Robot namespace
   std::string robot_ns_;
-
-  // Wheelbase (distance between front and rear axles) in meters
   double wheelbase_;
-
-  // Maximum steering angle in radians
   double max_steering_angle_;
 
-  // Whether the system has been properly configured
-  bool configured_{false};
-
-  // Last received Ackermann drive command
   ackermann_msgs::msg::AckermannDrive last_ackermann_cmd_;
-
-  // Mutex for thread safety between ROS callback and Gazebo update
   std::mutex ackermann_mutex_;
 
-  // Flag to indicate if a new command has been received
+  bool configured_{false};
   bool new_cmd_received_{false};
 
 public:
@@ -81,31 +63,25 @@ public:
     gz::sim::EntityComponentManager & /*ecm*/,
     gz::sim::EventManager & /*eventMgr*/) override
   {
-    // Initialize ROS 2 if not already initialized
     if (!rclcpp::ok()) {
       rclcpp::init(0, nullptr);
     }
 
-    // Get robot namespace from SDF
-    robot_ns_ = sdf->Get<std::string>("robotNamespace", "").first;
+    robot_ns_ = sdf->Get<std::string>("robot_namespace", "").first;
     if (!robot_ns_.empty() && robot_ns_.back() != '/') {
       robot_ns_ += "/";
     }
 
-    // Get wheelbase parameter
     wheelbase_ = sdf->Get<double>("wheelbase", 1.0).first;
 
-    // Get maximum steering angle parameter
-    max_steering_angle_ = sdf->Get<double>("maxSteeringAngle", 0.7854).first;
+    max_steering_angle_ = sdf->Get<double>("max_steering_angle", 0.7854).first;
 
-    // Create a ROS 2 node
     this->ros_node_ = std::make_shared<rclcpp::Node>("ackermann_to_twist_plugin");
 
-    // Set up ROS 2 subscriber for cmd_ackermann topic
     std::string ros_ackermann_topic = robot_ns_ + "cmd_ackermann";
     this->ros_sub_ = this->ros_node_->create_subscription<ackermann_msgs::msg::AckermannDrive>(
       ros_ackermann_topic,
-      rclcpp::QoS(10), // Standard QoS profile
+      rclcpp::QoS(10),
       [this](const ackermann_msgs::msg::AckermannDrive::SharedPtr msg) {
         std::lock_guard<std::mutex> lock(this->ackermann_mutex_);
         this->last_ackermann_cmd_ = *msg;
@@ -113,7 +89,6 @@ public:
       }
     );
 
-    // Set up Gazebo publisher for cmd_vel topic
     std::string gz_cmd_vel_topic = robot_ns_ + "cmd_vel";
     cmd_vel_pub_ = gz_node_.Advertise<gz::msgs::Twist>(gz_cmd_vel_topic);
     if (!cmd_vel_pub_) {
@@ -138,14 +113,11 @@ public:
     if (!configured_) {
       return;
     }
-
-    // Spin the ROS node to process any incoming messages
     rclcpp::spin_some(this->ros_node_);
 
     std::lock_guard<std::mutex> lock(ackermann_mutex_);
     
     if (new_cmd_received_) {
-      // Convert Ackermann command to Twist and publish
       gz::msgs::Twist twist_msg;
       ConvertAckermannToTwist(last_ackermann_cmd_, twist_msg);
       cmd_vel_pub_.Publish(twist_msg);
@@ -158,22 +130,17 @@ private:
   {
     twist.Clear();
 
-    // Get speed and steering angle from the ROS 2 message
     double speed = ackermann.speed;
     double steering_angle = ackermann.steering_angle;
 
-    // Clamp steering angle to maximum allowed
     steering_angle = std::clamp(steering_angle, -max_steering_angle_, max_steering_angle_);
 
-    // The linear velocity is the desired forward speed
     twist.mutable_linear()->set_x(speed);
     twist.mutable_linear()->set_y(0.0);
     twist.mutable_linear()->set_z(0.0);
 
-    // Calculate angular velocity using Ackermann steering geometry:
-    // angular_velocity = (linear_velocity * tan(steering_angle)) / wheelbase
     double angular_velocity = 0.0;
-    if (std::abs(wheelbase_) > 1e-6) { // Avoid division by zero
+    if (std::abs(wheelbase_) > 0) {
         angular_velocity = (speed * std::tan(steering_angle)) / wheelbase_;
     }
 
