@@ -12,9 +12,13 @@ find_package(ackermann_msgs REQUIRED)
 
 find_package(gz_sim_vendor REQUIRED)
 find_package(gz_plugin_vendor REQUIRED)
+find_package(gz_transport_vendor REQUIRED)
+find_package(gz_msgs_vendor REQUIRED)
 
 find_package(gz-sim REQUIRED)
 find_package(gz-plugin REQUIRED)
+find_package(gz-transport REQUIRED)
+find_package(gz-msgs REQUIRED)
 
 
 add_library(raph_gz_ackermann_plugin SHARED
@@ -31,9 +35,21 @@ ament_target_dependencies(raph_gz_ackermann_plugin
   ackermann_msgs
 )
 
+add_library(raph_gz_lidar_filter_plugin SHARED
+  src/lidar_angle_filter.cpp
+)
+
+target_link_libraries(raph_gz_lidar_filter_plugin
+  gz-sim::core
+  gz-plugin::core
+  gz-transport::core
+  gz-msgs::core
+)
+
 install(
   TARGETS
     raph_gz_ackermann_plugin
+    raph_gz_lidar_filter_plugin
   DESTINATION lib
 )
 
