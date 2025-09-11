@@ -9,6 +9,7 @@ find_package(ament_cmake REQUIRED)
 
 find_package(rclcpp REQUIRED)
 find_package(ackermann_msgs REQUIRED)
+find_package(raph_interfaces REQUIRED)
 
 find_package(gz_sim_vendor REQUIRED)
 find_package(gz_plugin_vendor REQUIRED)
@@ -21,18 +22,19 @@ find_package(gz-transport REQUIRED)
 find_package(gz-msgs REQUIRED)
 
 
-add_library(raph_gz_ackermann_plugin SHARED
-  src/ackermann_to_twist.cpp
+add_library(raph_gz_steering_system SHARED
+  src/raph_steering_system.cpp
 )
 
-target_link_libraries(raph_gz_ackermann_plugin
+target_link_libraries(raph_gz_steering_system
   gz-sim::core
   gz-plugin::core
   rclcpp::rclcpp
 )
 
-ament_target_dependencies(raph_gz_ackermann_plugin
+ament_target_dependencies(raph_gz_steering_system
   ackermann_msgs
+  raph_interfaces
 )
 
 add_library(raph_gz_lidar_filter_plugin SHARED
@@ -48,7 +50,7 @@ target_link_libraries(raph_gz_lidar_filter_plugin
 
 install(
   TARGETS
-    raph_gz_ackermann_plugin
+    raph_gz_steering_system
     raph_gz_lidar_filter_plugin
   DESTINATION lib
 )

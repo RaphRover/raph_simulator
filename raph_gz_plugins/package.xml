@@ -17,6 +17,7 @@
     <depend>gz_transport_vendor</depend>
     <depend>gz_msgs_vendor</depend>
     <depend>ackermann_msgs</depend>
+    <depend>raph_interfaces</depend>
     <depend>ros_gz_bridge</depend>
 
     <test_depend>ament_lint_auto</test_depend>
