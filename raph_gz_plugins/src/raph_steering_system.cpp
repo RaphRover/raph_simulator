@@ -91,8 +91,9 @@ public:
     }
 
     robot_ns_ = sdf->Get<std::string>("robot_namespace", "").first;
-    if (!robot_ns_.empty() && robot_ns_.back() != '/') {
-      robot_ns_ += "/";
+
+    if (!robot_ns_.empty() && robot_ns_.back() == '/') {
+     robot_ns_.pop_back();
     }
 
     wheelbase_ = sdf->Get<double>("wheelbase", 0.378).first;
@@ -109,7 +110,7 @@ public:
     left_drive_wheel_joint_ = sdf->Get<std::string>("left_drive_wheel_joint", "front_left_wheel_joint").first;
     right_drive_wheel_joint_ = sdf->Get<std::string>("right_drive_wheel_joint", "front_right_wheel_joint").first;
 
-    this->ros_node_ = std::make_shared<rclcpp::Node>("raph_gz_steering_system", robot_ns_);
+    this->ros_node_ = std::make_shared<rclcpp::Node>("raph_gz_steering_system", "/" + robot_ns_);
     std::string ros_ackermann_topic = "cmd_ackermann";
     this->ros_sub_ = this->ros_node_->create_subscription<ackermann_msgs::msg::AckermannDrive>(
       ros_ackermann_topic,
