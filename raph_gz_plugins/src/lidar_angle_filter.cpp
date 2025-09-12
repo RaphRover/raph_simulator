@@ -55,12 +55,6 @@ class LidarAngleFilter
   std::string output_topic_;
   std::vector<AngleRange> filter_ranges_;
 
-  gz::msgs::LaserScan last_scan_;
-  std::mutex scan_mutex_;
-
-  bool configured_{false};
-  bool new_scan_received_{false};
-
 public:
   void Configure(
     const gz::sim::Entity & /*entity*/,
@@ -75,49 +69,24 @@ public:
 
     filtered_lidar_pub_ = gz_node_.Advertise<gz::msgs::LaserScan>(output_topic_);
     if (!filtered_lidar_pub_) {
-      gzerr << "Failed to create Gazebo publisher for topic: " << output_topic_ << std::endl;
       return;
     }
 
     gz_sub_callback_ = [this](const gz::msgs::LaserScan& msg) {
-      std::lock_guard<std::mutex> lock(this->scan_mutex_);
-      this->last_scan_ = msg;
-      this->new_scan_received_ = true;
+      filtered_lidar_pub_.Publish(FilterLidarScan(msg));
     };
 
     if (!gz_node_.Subscribe(input_topic_, gz_sub_callback_)) {
-      gzerr << "Failed to subscribe to Gazebo topic: " << input_topic_ << std::endl;
       return;
     }
-
-    gzmsg << "LidarAngleFilter configured successfully!" << std::endl;
-    gzmsg << "Input topic: " << input_topic_ << std::endl;
-    gzmsg << "Output topic: " << output_topic_ << std::endl;
-    gzmsg << "Filter ranges configured: " << filter_ranges_.size() << std::endl;
-
-    for (size_t i = 0; i < filter_ranges_.size(); ++i) {
-      gzmsg << "  Range " << i << ": [" << filter_ranges_[i].min_angle 
-            << ", " << filter_ranges_[i].max_angle << "] rad" << std::endl;
-    }
-
-    configured_ = true;
   }
 
+  // PreUpdate override is necessary to register plugin
   void PreUpdate(
     const gz::sim::UpdateInfo & /*info*/,
     gz::sim::EntityComponentManager & /*ecm*/) override
   {
-    if (!configured_) {
-      return;
-    }
-
-    std::lock_guard<std::mutex> lock(scan_mutex_);
-    
-    if (new_scan_received_) {
-      gz::msgs::LaserScan filtered_scan = FilterLidarScan(last_scan_);
-      filtered_lidar_pub_.Publish(filtered_scan);
-      new_scan_received_ = false;
-    }
+    return;
   }
 
 private:
@@ -127,40 +96,33 @@ private:
 
     if (sdf->HasElement("filter_ranges")) {
       auto filter_ranges_elem = std::const_pointer_cast<sdf::Element>(sdf)->GetElement("filter_ranges");
-      
+
       if (filter_ranges_elem) {
         auto range_elem = filter_ranges_elem->GetElement("range");
         while (range_elem) {
           double min_angle = range_elem->Get<double>("min", 0.0).first;
           double max_angle = range_elem->Get<double>("max", 0.0).first;
-          
+
           if (min_angle < max_angle) {
             filter_ranges_.push_back({min_angle, max_angle});
-            gzmsg << "Added filter range: [" << min_angle << ", " << max_angle << "] rad" << std::endl;
-          } else {
-            gzerr << "Invalid filter range: min_angle (" << min_angle 
-                  << ") must be less than max_angle (" << max_angle << ")" << std::endl;
           }
-          
           range_elem = range_elem->GetNextElement("range");
         }
       }
-    } else {
-      gzmsg << "No filter ranges specified, plugin will not filter any angles." << std::endl;
     }
   }
 
   gz::msgs::LaserScan FilterLidarScan(const gz::msgs::LaserScan& input_scan)
   {
     gz::msgs::LaserScan filtered_scan = input_scan;
-    
+
     double angle_min = input_scan.angle_min();
     double angle_step = input_scan.angle_step();
     int range_count = input_scan.ranges_size();
-    
+
     for (int i = 0; i < range_count; ++i) {
       double current_angle = angle_min + i * angle_step;
-      
+
       bool should_filter = false;
       for (const auto& range : filter_ranges_) {
         if (current_angle >= range.min_angle && current_angle <= range.max_angle) {
@@ -168,7 +130,7 @@ private:
           break;
         }
       }
-      
+
       if (should_filter) {
         filtered_scan.set_ranges(i, std::numeric_limits<double>::infinity());
         if (input_scan.intensities_size() > i) {
@@ -176,7 +138,6 @@ private:
         }
       }
     }
-    
     return filtered_scan;
   }
 };
