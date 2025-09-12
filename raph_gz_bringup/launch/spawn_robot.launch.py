@@ -32,7 +32,7 @@ import xacro
 
 def spawn_robot(context: LaunchContext, namespace: LaunchConfiguration):
     pkg_project_description = get_package_share_directory("raph_description")
-    robot_ns = context.perform_substitution(namespace)
+    robot_ns = context.perform_substitution(namespace).strip("/")
 
     robot_desc = xacro.process(
         os.path.join(
@@ -85,9 +85,7 @@ def spawn_robot(context: LaunchContext, namespace: LaunchConfiguration):
         executable="parameter_bridge",
         name=node_name_prefix + "parameter_bridge",
         arguments=[
-            robot_ns + "/cmd_vel@geometry_msgs/msg/Twist]gz.msgs.Twist",
             robot_ns + "/odom@nav_msgs/msg/Odometry[gz.msgs.Odometry",
-            robot_ns + "/tf@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V",
             robot_ns + "/imu/data@sensor_msgs/msg/Imu[gz.msgs.IMU",
             robot_ns
             + "/oak/rgb/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo",
@@ -96,11 +94,6 @@ def spawn_robot(context: LaunchContext, namespace: LaunchConfiguration):
             robot_ns + "/joint_states@sensor_msgs/msg/JointState[gz.msgs.Model",
             robot_ns + "/scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan",
             robot_ns + "/oak/depth/image_raw/points@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked",
-        ],
-        parameters=[
-            {
-                "qos_overrides./tf_static.publisher.durability": "transient_local",
-            }
         ],
         remappings=[('/oak/depth/image_raw/points', '/oak/points')],
         output="screen",
