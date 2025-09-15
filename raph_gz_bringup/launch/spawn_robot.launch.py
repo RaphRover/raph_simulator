@@ -85,8 +85,8 @@ def spawn_robot(context: LaunchContext, namespace: LaunchConfiguration):
         executable="parameter_bridge",
         name=node_name_prefix + "parameter_bridge",
         arguments=[
-            robot_ns + "/odom@nav_msgs/msg/Odometry[gz.msgs.Odometry",
-            robot_ns + "/imu/data@sensor_msgs/msg/Imu[gz.msgs.IMU",
+            robot_ns + "/controller/odom@nav_msgs/msg/Odometry[gz.msgs.Odometry",
+            robot_ns + "/controller/imu@sensor_msgs/msg/Imu[gz.msgs.IMU",
             robot_ns
             + "/oak/rgb/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo",
             robot_ns
