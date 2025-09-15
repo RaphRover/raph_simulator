@@ -111,7 +111,7 @@ public:
     right_drive_wheel_joint_ = sdf->Get<std::string>("right_drive_wheel_joint", "front_right_wheel_joint").first;
 
     this->ros_node_ = std::make_shared<rclcpp::Node>("raph_gz_steering_system", "/" + robot_ns_);
-    std::string ros_ackermann_topic = "cmd_ackermann";
+    std::string ros_ackermann_topic = "controller/cmd_ackermann";
     this->ros_sub_ = this->ros_node_->create_subscription<ackermann_msgs::msg::AckermannDrive>(
       ros_ackermann_topic,
       rclcpp::QoS(1),
@@ -124,7 +124,7 @@ public:
       }
     );
 
-    std::string steering_mode_service_name = "~/set_steering_mode";
+    std::string steering_mode_service_name = "controller/set_steering_mode";
     this->steering_mode_service_ = this->ros_node_->create_service<raph_interfaces::srv::SetSteeringMode>(
       steering_mode_service_name,
       [this](const std::shared_ptr<raph_interfaces::srv::SetSteeringMode::Request> request,
@@ -185,6 +185,8 @@ private:
     current_steering_mode_ = requested_mode;
     StopMovement();
     SetServoPositions(requested_mode);
+
+    rclcpp::sleep_for(std::chrono::milliseconds(500));
 
     response->success = true;
     response->status_message = "Steering mode change initiated.";
