@@ -31,6 +31,7 @@
 #include <ackermann_msgs/msg/ackermann_drive.hpp>
 #include <raph_interfaces/msg/steering_mode.hpp>
 #include <raph_interfaces/srv/set_steering_mode.hpp>
+#include <geometry_msgs/msg/twist.hpp>
 
 #include <cmath>
 #include <memory>
@@ -55,8 +56,9 @@ private:
 
 
   std::shared_ptr<rclcpp::Node> ros_node_;
-  rclcpp::Subscription<ackermann_msgs::msg::AckermannDrive>::SharedPtr ros_sub_;
+  rclcpp::Subscription<ackermann_msgs::msg::AckermannDrive>::SharedPtr cmd_ackermann_sub_;
   rclcpp::Service<raph_interfaces::srv::SetSteeringMode>::SharedPtr steering_mode_service_;
+  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
 
   std::string robot_ns_;
 
@@ -111,22 +113,21 @@ public:
     right_drive_wheel_joint_ = sdf->Get<std::string>("right_drive_wheel_joint", "front_right_wheel_joint").first;
 
     this->ros_node_ = std::make_shared<rclcpp::Node>("raph_gz_steering_system", "/" + robot_ns_);
-    std::string ros_ackermann_topic = "controller/cmd_ackermann";
-    this->ros_sub_ = this->ros_node_->create_subscription<ackermann_msgs::msg::AckermannDrive>(
-      ros_ackermann_topic,
+
+    this->cmd_ackermann_sub_ = this->ros_node_->create_subscription<ackermann_msgs::msg::AckermannDrive>(
+      "controller/cmd_ackermann",
       rclcpp::QoS(1),
       [this](const ackermann_msgs::msg::AckermannDrive::SharedPtr msg) {
         if (current_steering_mode_ == raph_interfaces::msg::SteeringMode::ACKERMANN) {
-          Drive(msg->speed, msg->steering_angle);
+          this->Drive(msg->speed, msg->steering_angle);
         } else if (current_steering_mode_ == raph_interfaces::msg::SteeringMode::TURN_IN_PLACE) {
-          TurnInPlace(*msg);
+          this->TurnInPlace(msg->speed);
         }
       }
     );
 
-    std::string steering_mode_service_name = "controller/set_steering_mode";
     this->steering_mode_service_ = this->ros_node_->create_service<raph_interfaces::srv::SetSteeringMode>(
-      steering_mode_service_name,
+      "controller/set_steering_mode",
       [this](const std::shared_ptr<raph_interfaces::srv::SetSteeringMode::Request> request,
               std::shared_ptr<raph_interfaces::srv::SetSteeringMode::Response> response) {
         this->SteeringModeCallback(request, response);
@@ -146,6 +147,19 @@ public:
     right_steering_wheel_pub_ = gz_node_.Advertise<gz::msgs::Double>(right_steering_wheel_topic);
     left_drive_wheel_pub_ = gz_node_.Advertise<gz::msgs::Double>(left_drive_wheel_topic);
     right_drive_wheel_pub_ = gz_node_.Advertise<gz::msgs::Double>(right_drive_wheel_topic);
+
+    this->cmd_vel_sub_ = this->ros_node_->create_subscription<geometry_msgs::msg::Twist>(
+      "controller/cmd_vel",
+      rclcpp::QoS(1),
+      [this](const geometry_msgs::msg::Twist::SharedPtr msg) {
+        if (current_steering_mode_ == raph_interfaces::msg::SteeringMode::ACKERMANN) {
+          double steering_angle = GetSteeringAngleFromTwist(*msg);
+          this->Drive(msg->linear.x, steering_angle);
+        } else if (current_steering_mode_ == raph_interfaces::msg::SteeringMode::TURN_IN_PLACE) {
+          this->TurnInPlace(msg->angular.z);
+        }
+      }
+    );
 
     configured_ = true;
   }
@@ -225,13 +239,12 @@ private:
     }
   }
 
-  void TurnInPlace(const ackermann_msgs::msg::AckermannDrive & ackermann)
+  void TurnInPlace(double angular_velocity)
   {
     if (!left_steering_wheel_pub_ || !right_steering_wheel_pub_ || !left_drive_wheel_pub_ || !right_drive_wheel_pub_) {
       return;
     }
-
-    const double angular_velocity = ackermann.speed;
+    angular_velocity = std::clamp(angular_velocity, -max_wheel_speed_, max_wheel_speed_);
     const double radius_f = track_width_ / 2.0;
     const double radius_r = std::sqrt(std::pow(track_width_ / 2.0, 2.0) + std::pow(wheelbase_, 2.0));
 
@@ -329,6 +342,20 @@ private:
 
     msg.set_data(angle_r);
     right_steering_joint_pub_.Publish(msg);
+  }
+
+  double GetSteeringAngleFromTwist(geometry_msgs::msg::Twist msg)
+  {
+    double linear_velocity_x = msg.linear.x;
+    double angular_velocity_z = msg.angular.z;
+
+    if (linear_velocity_x == 0.0 || angular_velocity_z == 0.0) {
+     return 0;
+    }
+
+    linear_velocity_x = std::abs(linear_velocity_x);
+
+    return std::atan(wheelbase_ * angular_velocity_z / linear_velocity_x);
   }
 };
 

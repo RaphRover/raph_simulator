@@ -10,6 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(ackermann_msgs REQUIRED)
 find_package(raph_interfaces REQUIRED)
+find_package(geometry_msgs REQUIRED)
 
 find_package(gz_sim_vendor REQUIRED)
 find_package(gz_plugin_vendor REQUIRED)
@@ -35,6 +36,7 @@ target_link_libraries(raph_gz_steering_system
 ament_target_dependencies(raph_gz_steering_system
   ackermann_msgs
   raph_interfaces
+  geometry_msgs
 )
 
 add_library(raph_gz_lidar_filter_plugin SHARED

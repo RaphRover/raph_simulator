@@ -12,13 +12,14 @@
 
     <buildtool_depend>ament_cmake</buildtool_depend>
 
-    <depend>gz_plugin_vendor</depend>
-    <depend>gz_sim_vendor</depend>
-    <depend>gz_transport_vendor</depend>
-    <depend>gz_msgs_vendor</depend>
-    <depend>ackermann_msgs</depend>
-    <depend>raph_interfaces</depend>
-    <depend>ros_gz_bridge</depend>
+    <exec_depend>gz_plugin_vendor</exec_depend>
+    <exec_depend>gz_sim_vendor</exec_depend>
+    <exec_depend>gz_transport_vendor</exec_depend>
+    <exec_depend>gz_msgs_vendor</exec_depend>
+    <exec_depend>ackermann_msgs</exec_depend>
+    <exec_depend>geometry_msgs</exec_depend>
+    <exec_depend>raph_interfaces</exec_depend>
+    <exec_depend>ros_gz_bridge</exec_depend>
 
     <test_depend>ament_lint_auto</test_depend>
     <test_depend>ament_cmake_copyright</test_depend>
